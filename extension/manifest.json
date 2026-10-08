@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Player Focus Mode",
-  "version": "2.0.2",
+  "version": "2.0.4",
   "description": "Deixa apenas o player de video na tela, removendo cabecalho, sidebar, comentarios e anuncios. Suporta donghuanosekai.com.",
   "icons": {
     "16": "icons/icon16.png",

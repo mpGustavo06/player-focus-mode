@@ -61,8 +61,8 @@ continuam sem efeito até você recarregar.
 
 ### Modo teatro
 
-O botão **Teatro** fica na barra de controles do player. Ao ativá-lo, tudo
-some e sobra só o vídeo ocupando a tela inteira.
+O botão **Teatro** fica no canto superior direito do vídeo. Ao ativá-lo,
+tudo some e sobra só o vídeo ocupando a tela inteira.
 
 | Ação | Resultado |
 |---|---|

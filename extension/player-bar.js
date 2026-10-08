@@ -41,10 +41,10 @@
      que o normal, senão ele nasce e some antes de ser percebido. */
   const FIRST_SHOW_MS = 3000;
 
-  /* distância do botão em relação à borda de baixo do vídeo, quando ele
-     está no fallback (fora da barra de controles). Ajuste aqui se
-     quiser subir/descer. */
-  const BTN_BOTTOM = 158;
+  /* posição do botão no canto superior direito do vídeo.
+     Ajuste estes dois números se quiser aproximar/afastar da borda. */
+  const BTN_TOP = 24;
+  const BTN_RIGHT = 24;
 
   let current = false;
   let next = false;
@@ -176,6 +176,12 @@
      `position: fixed`, ele fica grudado na tela e rola por cima de
      outros controles. A âncora é o container do <video>, com
      position absolute — assim ele desce junto com o player. */
+  /* Prende o botão ao container do <video>, no canto superior direito.
+
+     Importante ancorar no VÍDEO e não na janela: com `position: fixed`
+     o botão fica grudado na tela e rola por cima de outros controles.
+     Com `absolute` dentro do container do vídeo, ele acompanha o
+     player quando a página rola. */
   const anchorToVideo = (host) => {
     const video = document.querySelector("video");
     if (!video || !video.parentElement) {
@@ -194,27 +200,23 @@
     }
 
     box.appendChild(host);
-    host.style.cssText =
-      "position:absolute;left:8px;z-index:2147483000;opacity:1;" +
-      "transition:opacity .35s ease;bottom:" +
-      BTN_BOTTOM +
-      "px;";
   };
 
   /* ---------- o botão ---------- */
 
-  const buildUI = (inBar) => {
+  const buildUI = () => {
     const host = document.createElement("div");
     host.id = BTN_ID;
 
-    /* Dentro da barra o botão entra no fluxo (ao lado do pause/volume).
-       Fora da barra, o posicionamento é definido depois por
-       anchorToVideo(), que o prende ao <video> e não à janela. */
-    host.style.cssText = inBar
-      ? "display:inline-block;vertical-align:middle;margin:0 4px;opacity:1;transition:opacity .35s ease;"
-      : "position:absolute;left:8px;bottom:" +
-        BTN_BOTTOM +
-        "px;z-index:2147483000;opacity:1;transition:opacity .35s ease;";
+    /* O botão fica sempre no canto superior direito do vídeo, ancorado
+       ao container do <video> (ver anchorToVideo). Não entra mais no
+       fluxo da barra de controles, que fica na parte de baixo. */
+    host.style.cssText =
+      "position:absolute;top:" +
+      BTN_TOP +
+      "px;right:" +
+      BTN_RIGHT +
+      "px;z-index:2147483000;opacity:1;transition:opacity .35s ease;";
 
     const root = host.attachShadow({ mode: "open" });
 
@@ -321,11 +323,11 @@
       return;
     }
 
-    const bar = findControlBar();
-    const host = buildUI(!!bar);
-
-    if (bar) bar.appendChild(host);
-    else anchorToVideo(host);
+    /* o botão não entra na barra de controles: vai sempre ancorado no
+       canto superior direito do vídeo. findControlBar() continua sendo
+       usado apenas como sinal na arbitragem (para eleger o frame certo). */
+    const host = buildUI();
+    anchorToVideo(host);
 
     ui = host;
     paint();
