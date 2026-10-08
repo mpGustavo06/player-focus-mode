@@ -182,6 +182,15 @@ html.dnsk-opt-nocomments .related_posts {
   display: none !important;
 }
 
+/* Botão de "expandir/tela cheia" do site (.wide_video).
+   Fica no fim da lista de controles e não serve para nada aqui —
+   o modo teatro já cobre a tela cheia. Some junto com os controles. */
+html.dnsk-active .wide_video,
+html.dnsk-opt-onlyplayer .wide_video,
+html.dnsk-theater .wide_video {
+  display: none !important;
+}
+
 /* ============================================================
    .report-wrapper — o "> " órfão que ocupa uma coluna
 

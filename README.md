@@ -74,6 +74,7 @@ sobraram / foram apagados:
 | Rodapé e créditos | `footer.footer`, `.creditos` | **removido** |
 | Nav legal inferior | `nav.legal-nav` | **removido** |
 | Bolha flutuante de comentários | `.wpd-bubble-wrapper` (bolha de comentários) | **removido** |
+| `.wide_video` (botão de expandir da barra) | **removido** |
 
 ### O que **permanece** (o player e seus controles)
 

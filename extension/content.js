@@ -126,12 +126,21 @@
     ".wpd-bubble-wrapper"
   ].join(",");
 
-  /* O modal de "Reportar" (.report-wrapper) não existe no HTML servido:
-     o script.js só chama `.report-wrapper.show()`, então ele é criado
-     em tempo de execução por script de anúncio. Como o tema usa
-     `display: table` dentro dele, um nó de texto órfão vira uma célula
-     e aparece um ">" sozinho ocupando uma coluna. Removemos o nó. */
-  const REPORT_NODES = [
+  /* ---------- UI sobra do tema: o que sai do DOM de vez ----------
+
+     Duas coisas diferentes, por isso uma lista só:
+
+     1) .wide_video — o botão de expandir/tela cheia que fica no fim da
+        ul.list da barra .controles. Como a barra é flex, escondê-lo por
+        CSS já resolveria, mas remover o nó evita deixar o item no DOM.
+
+     2) .report-wrapper — o modal de "Reportar". Ele NÃO existe no HTML
+        servido: o script.js só chama `.report-wrapper.show()`, então é
+        criado em tempo de execução por script de anúncio. Como o tema
+        usa `display: table` dentro dele, um nó de texto órfão vira uma
+        célula e aparece um ">" sozinho ocupando uma coluna. */
+  const UI_NODES = [
+    ".wide_video",
     ".report-wrapper",
     ".report-wrapper .content-wrapper",
     ".report-wrapper .content-container",
@@ -188,7 +197,7 @@
     if (!active) return;
     if (options.hideAds) removeMatches(document, AD_NODES);
     if (options.hideComments) removeMatches(document, COMMENT_NODES);
-    removeMatches(document, REPORT_NODES);
+    removeMatches(document, UI_NODES);
     removeStrayText();
   };
 
