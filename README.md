@@ -72,7 +72,8 @@ some e sobra só o vídeo ocupando a tela inteira.
 | Tecla **Esc** | sai do modo teatro |
 
 O botão **some sozinho depois de 1,5 segundo** sem mexer o mouse e volta
-assim que o cursor se mexe. Ele acompanha o vídeo: se você rolar a
+assim que o cursor se mexe. Na primeira aparição ele fica 3 segundos
+visível, para ser percebido antes de sumir. Ele acompanha o vídeo: se você rolar a
 página, ele desce junto.
 
 O estado é salvo, então o modo teatro **continua ligado ao trocar de
@@ -111,6 +112,69 @@ anúncios · popups e smartlink · botão de expandir do site · modal de
 
 O player · o menu de troca de player · anterior / próximo episódio · link
 para a lista completa · botão de download · alternador de modo claro
+
+---
+
+## Como está organizado
+
+```
+extension/
+├── core/               # compartilhado por todos os sites
+│   ├── options.js      # preferências (chrome.storage.sync)
+│   ├── sites.js        # registro de perfis
+│   ├── style.js        # gera o CSS a partir do perfil
+│   ├── nodes.js        # limpeza do DOM
+│   └── arbiter.js      # coordena o botão entre iframes
+├── sites/              # um perfil por site
+│   ├── index.js
+│   └── donghuanosekai.js
+├── content.js          # orquestrador
+├── player-bar.js       # botão de teatro dentro do player
+├── background.js
+├── popup.html / popup.js
+└── rules/ad-block.json
+```
+
+Nenhum arquivo do `core/` conhece a estrutura de um site. Isso está
+tudo no perfil correspondente.
+
+### Adicionar um site novo
+
+1. Copie `sites/donghuanosekai.js` para `sites/meusite.js` e ajuste:
+
+```js
+PFM.registerSite({
+  id: "meusite",
+  hosts: ["meusite.com"],
+
+  // obrigatório: como reconhecer uma página de vídeo
+  isPlayerPage() {
+    return !!document.querySelector("#player-wrapper");
+  },
+
+  // obrigatório: onde fica o player
+  player: { container: "#player", stage: "#player-wrapper" },
+
+  layout: { column: ".container", row: ".row", cell: ".content" },
+  controls: [".controls"],
+
+  hide: {
+    header: [".site-header"],
+    title: [".video-title"],
+    sidebar: [".sidebar"],
+    comments: [".comments"],
+    banners: [".banner"],
+    always: [".ad-placeholder"]
+  },
+
+  remove: [],
+  css: ""
+});
+```
+
+2. Acrescente `"sites/meusite.js"` na lista `js` do content script em
+   `manifest.json`, **antes** de `content.js`
+3. Acrescente o domínio em `matches` e em `host_permissions`
 
 ---
 

@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "DNSK Player Only",
-  "version": "1.9.2",
-  "description": "Remove todo o layout do donghuanosekai.com e deixa apenas o player de video na tela.",
+  "name": "Player Focus Mode",
+  "version": "2.0.2",
+  "description": "Deixa apenas o player de video na tela, removendo cabecalho, sidebar, comentarios e anuncios. Suporta donghuanosekai.com.",
   "icons": {
     "16": "icons/icon16.png",
     "32": "icons/icon32.png",
@@ -21,7 +21,7 @@
     "service_worker": "background.js"
   },
   "action": {
-    "default_title": "DNSK Player Only",
+    "default_title": "Player Focus Mode",
     "default_popup": "popup.html",
     "default_icon": {
       "16": "icons/icon16.png",
@@ -37,10 +37,14 @@
         "*://*.donghuanosekai.com/*"
       ],
       "js": [
+        "core/options.js",
+        "core/sites.js",
+        "core/style.js",
+        "core/nodes.js",
+        "core/arbiter.js",
+        "sites/index.js",
+        "sites/donghuanosekai.js",
         "content.js"
-      ],
-      "css": [
-        "content.css"
       ],
       "run_at": "document_start",
       "all_frames": false
@@ -63,6 +67,7 @@
         "*://*.donghuanosekai.com/*"
       ],
       "js": [
+        "core/arbiter.js",
         "player-bar.js"
       ],
       "run_at": "document_idle",
@@ -77,5 +82,6 @@
         "path": "rules/ad-block.json"
       }
     ]
-  }
+  },
+  "short_name": "Player Focus"
 }

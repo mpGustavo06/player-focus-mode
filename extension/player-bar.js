@@ -1,5 +1,5 @@
 /* ============================================================
-   DNSK Player Only — botão de modo teatro DENTRO do player
+   player-bar.js — botão de modo teatro DENTRO do player
 
    Este script roda em TODOS os frames (all_frames: true), mas só age
    no frame que realmente contém o player de vídeo.
@@ -17,22 +17,29 @@
    por isso este script é separado do content.js (que roda só no frame
    principal).
 
-   ARBITRAGEM: o site embute o player em vários frames e alguns deles
-   também têm <video>. Sem coordenação, cada um montaria o seu botão e
-   apareceriam duplicados. O frame principal (content.js) é o árbitro e
-   este frame só monta se receber "grant" via postMessage — que
-   atravessa origem, ao contrário do storage (o player é
-   player.donghuanosekai.com e o wrapper é donghuanosekai.com).
+   Ele éagnóstico de site: não conhece nenhum seletor do donghuanosekai.
+   Detecta o player por assinatura de biblioteca de player (Video.js,
+   JWPlayer, Plyr, ArtPlayer, Shaka, xgplayer) ou pela URL do endpoint.
+   A única coordenação com a página é o árbitro (core/arbiter.js), que
+   roda no frame principal e garante que só UM botão seja montado em
+   toda a cadeia de iframes.
+
+   Depende de core/arbiter.js estar carregado antes (o manifest
+   garante a ordem).
    ============================================================ */
 
 (() => {
   "use strict";
 
   /* id do host injetado neste frame */
-  const BTN_ID = "dnsk-theater-inplayer";
+  const BTN_ID = "pfm-theater-inplayer";
 
   /* ms de inatividade até o botão sumir de novo */
   const HIDE_AFTER_MS = 1500;
+
+  /* ms que o botão fica visível na PRIMEIRA aparição. Um pouco maior
+     que o normal, senão ele nasce e some antes de ser percebido. */
+  const FIRST_SHOW_MS = 3000;
 
   /* distância do botão em relação à borda de baixo do vídeo, quando ele
      está no fallback (fora da barra de controles). Ajuste aqui se
@@ -163,65 +170,6 @@
     return false;
   };
 
-  /* ---------- arbitragem com o frame principal ---------- */
-
-  const askArbiter = (timeoutMs) =>
-    new Promise((resolve) => {
-      let settled = false;
-      let timer = null;
-
-      const finish = (value) => {
-        if (settled) return;
-        settled = true;
-        if (timer) clearTimeout(timer);
-        window.removeEventListener("message", onMsg);
-        resolve(value);
-      };
-
-      const onMsg = (ev) => {
-        const d = ev.data;
-        if (!d || d.__dnsk !== "theater" || d.id !== FRAME_ID) return;
-        if (d.kind === "grant") finish(true);
-        else if (d.kind === "deny") finish(false);
-      };
-
-      timer = setTimeout(() => finish(null), timeoutMs || 1200);
-      window.addEventListener("message", onMsg);
-
-      try {
-        /* manda profundidade e se achou a barra: o arbitro usa isso para
-           eleger o frame certo entre varios candidatos */
-        window.top.postMessage(
-          {
-            __dnsk: "theater",
-            kind: "probe",
-            id: FRAME_ID,
-            depth: frameDepth(),
-            hasBar: !!findControlBar()
-          },
-          "*"
-        );
-      } catch (e) {
-        finish(null);
-      }
-    });
-
-  const notifyGone = () => {
-    try {
-      window.top.postMessage({ __dnsk: "theater", kind: "gone", id: FRAME_ID }, "*");
-    } catch (e) {
-      /* frame principal inacessível */
-    }
-  };
-
-  const notifyMounted = () => {
-    try {
-      window.top.postMessage({ __dnsk: "theater", kind: "mounted", id: FRAME_ID }, "*");
-    } catch (e) {
-      /* frame principal inacessível */
-    }
-  };
-
   /* Onde ancorar o botão quando não achamos a barra de controles.
 
      O botão precisa acompanhar o VÍDEO, não a janela: se for
@@ -344,7 +292,9 @@
     document.addEventListener("mousemove", show, { passive: true });
     document.addEventListener("touchstart", show, { passive: true });
 
-    scheduleHide();
+    /* primeira aparição: fica mais tempo à vista */
+    clearTimeout(host.__hideTimer);
+    host.__hideTimer = setTimeout(hide, FIRST_SHOW_MS);
     return host;
   };
 
@@ -379,7 +329,15 @@
 
     ui = host;
     paint();
-    notifyMounted();
+    PFM.arbiter.notify(FRAME_ID, "mounted");
+
+    /* heartbeat: enquanto este frame detém a vaga, avisa que continua vivo.
+       Se o site destruir este iframe, o pulso para e o árbitro libera
+       a vaga para o novo frame do player. */
+    setInterval(() => {
+      if (ui && !ui.isConnected) return;
+      PFM.arbiter.notify(FRAME_ID, "ping");
+    }, 3000);
   };
 
 const mountIfWinner = async () => {
@@ -401,7 +359,11 @@ const mountIfWinner = async () => {
        respondeu em 500ms, é porque não há árbitro. A segunda é mais
        generosa, para o caso de o frame principal estar carregando. */
     for (const timeoutMs of [500, 900]) {
-      const granted = await askArbiter(timeoutMs);
+      const granted = await PFM.arbiter.probe(
+        FRAME_ID,
+        frameDepth(),
+        !!findControlBar()
+      );
       if (granted === true) {
         mount();
         return;
@@ -473,10 +435,14 @@ const mountIfWinner = async () => {
   window.addEventListener("load", mountIfWinner, { once: true });
 
   let pending = false;
+  const raf =
+    typeof window.requestAnimationFrame === "function"
+      ? window.requestAnimationFrame.bind(window)
+      : (fn) => setTimeout(fn, 16);
   const obs = new MutationObserver(() => {
     if (pending || ui) return;
     pending = true;
-    requestAnimationFrame(() => {
+    raf(() => {
       pending = false;
       mountIfWinner();
     });
@@ -503,7 +469,7 @@ const mountIfWinner = async () => {
       ui = null;
       /* avisa que a concessão anterior ficou sem botão, para o
          árbitro liberar a vaga em vez de ficar segurando */
-      notifyGone();
+      PFM.arbiter.notify(FRAME_ID, "gone");
       mountIfWinner();
     }
   }, 2000);

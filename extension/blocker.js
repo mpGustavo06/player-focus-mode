@@ -1,5 +1,5 @@
 /* ============================================================
-   DNSK Player Only — bloqueia scripts de ads/popunder no
+   Player Focus Mode — bloqueia scripts de ads/popunder no
    contexto MAIN (antes do script da página rodar).
 
    Só age se a página tiver o player de vídeo, para não
@@ -20,7 +20,7 @@
     try {
       const target = typeof url === "string" ? url : url && url.href;
       if (isAdUrl(target)) {
-        console.warn("[DNSK] popup de anúncio bloqueado:", target);
+        console.warn("[PFM] popup de anúncio bloqueado:", target);
         return null;
       }
     } catch (e) {
@@ -39,10 +39,10 @@
     /* ignore */
   }
 
-  /* A função dnskPlayerAd() abre o smartlink quando o player é
-     carregado. Ela é redefinida aqui; o content script só permite
-     a limpeza visual quando há player na página. */
+  /* A função `dnskPlayerAd()` abre o smartlink quando o player é
+     carregado. O nome é do SITE e precisa ser preservado — é por ele
+     que a sobrescrita abaixo funciona. */
   window.dnskPlayerAd = function () {
-    console.warn("[DNSK] dnskPlayerAd() neutralizado.");
+    console.warn("[PFM] dnskPlayerAd() neutralizado.");
   };
 })();

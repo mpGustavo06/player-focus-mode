@@ -33,7 +33,7 @@ async function refreshRules(options) {
       disableRulesetIds: enabled ? [] : ["ad_block"]
     });
   } catch (e) {
-    console.warn("[DNSK] falha ao alternar ruleset", e);
+    console.warn("[PFM] falha ao alternar ruleset", e);
   }
 }
 
