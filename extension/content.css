@@ -1,0 +1,397 @@
+/* ============================================================
+   DNSK Player Only
+   Estilos aplicados via manifest (run_at: document_start).
+
+   IMPORTANTE: todas as regras começam com uma classe
+   (`html.dnsk-opt-*`) que SÓ é adicionada pelo content.js quando
+   a página realmente contém o player (#playVideo / #player).
+   Assim a extensão não afeta a home, listas de donghuas, busca, etc.
+   ============================================================ */
+
+/* =====================================================================
+   1. PLAYER — a parte sensível, cuidado aqui.
+
+   O tema do site usa a técnica antiga de aspect ratio:
+
+       #player { position: relative; width: 100%; padding-top: 56.6% }
+       #player iframe { position:absolute; top:0; left:0; width:100%; height:100% }
+
+   Não podemos simplesmente SOMAR `aspect-ratio` por cima disso: o
+   padding-top continua reservando altura, então o player fica com
+   16:9 E 56.6% empilhados e o vídeo aparece esticado/zoomado.
+   Por isso aqui a gente:
+     - zera o padding-top do #player (quem controla a proporção agora é o
+       #playVideo), e
+     - usa a MESMA técnica do tema no #playVideo (padding-top em %),
+       sem aspect-ratio e sem `inset` no iframe.
+   ======================================== */
+html.dnsk-opt-wide #player {
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  background: #000 !important;
+  padding-top: 0 !important;
+}
+
+/* o #player tem <img>, <span> e <meta> como filhos diretos (schema.org).
+   Todos são posicionados fora do fluxo pra não somarem altura. */
+html.dnsk-opt-wide #player > *:not(#playVideo) {
+  position: absolute !important;
+  width: 0 !important;
+  height: 0 !important;
+  overflow: hidden !important;
+  visibility: hidden !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+html.dnsk-opt-wide #playVideo {
+  position: relative !important;
+
+  /* Player em tela cheia: largura total, 16:9, e a ALTURA pode passar da
+     janela de propósito. Os controles do site (.mobile_b e .controles)
+     ficam logo abaixo, então é preciso rolar até eles — que é o
+     comportamento desejado. Uma versão anterior limitava a altura a
+     `100vh - 120px` para caber tudo sem rolagem, mas isso deixava o
+     vídeo pequeno demais. */
+  width: 100% !important;
+  max-height: none !important;
+  aspect-ratio: 16 / 9 !important;
+  margin: 0 !important;
+  overflow: hidden !important;
+}
+
+html.dnsk-opt-wide #playVideo iframe {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  border: 0 !important;
+  margin: 0 !important;
+  max-width: none !important;
+  transform: none !important;
+  zoom: 1 !important;
+}
+
+/* miniatura de histórico que fica sobre o player */
+html.dnsk-opt-wide #thumbHis {
+  display: none !important;
+}
+
+/* =====================================================================
+   2. LAYOUT — a coluna de conteúdo ocupa a tela toda
+   ======================================== */
+html.dnsk-opt-wide body {
+  background: #000 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+html.dnsk-opt-wide .m_center {
+  max-width: none !important;
+  width: 100% !important;
+  padding: 0 !important;
+  margin: 0 auto !important;
+}
+
+/* o tema usa .rwl como <table> e .clw/.crw como <table-cell> (sidebar).
+   Com a sidebar escondida, forçamos block para a coluna ocupar 100%. */
+html.dnsk-opt-wide .rwl {
+  display: block !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  width: 100% !important;
+}
+
+html.dnsk-opt-wide .clw {
+  display: block !important;
+  width: 100% !important;
+  max-width: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+html.dnsk-opt-wide #fullno {
+  width: 100% !important;
+  max-width: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+/* espaços reservados a anúncio no topo do vídeo */
+html.dnsk-opt-wide .videoFull,
+html.dnsk-opt-wide .js_video_main {
+  display: none !important;
+}
+
+/* =====================================================================
+   3. BLOCOS QUE SOMEM
+   ======================================== */
+
+/* cabeçalho: logo, busca, login, hamburger
+   (o <ul class="m_menu"> é mantido) */
+html.dnsk-opt-nohdr header .m_nav,
+html.dnsk-opt-nohdr header .separador,
+html.dnsk-opt-nohdr header .menu_open {
+  display: none !important;
+}
+
+/* título do episódio, data, categoria, visualizações, social */
+html.dnsk-opt-notitle .article_title {
+  display: none !important;
+}
+
+/* lista de episódios (sidebar) */
+html.dnsk-opt-notitle .rwl .crw,
+html.dnsk-opt-notitle #list_eps,
+html.dnsk-opt-notitle .sidebar,
+html.dnsk-opt-notitle .titleSidebar,
+html.dnsk-opt-notitle .sidebarContent,
+html.dnsk-opt-notitle .postsNew,
+html.dnsk-opt-notitle .widget_recent_entries,
+html.dnsk-opt-notitle .recent-posts-2 {
+  display: none !important;
+}
+
+/* "Donghuas Recomendados" (carrossel) */
+html.dnsk-opt-notitle .sliderRecomendado,
+html.dnsk-opt-notitle .titleC {
+  display: none !important;
+}
+
+/* banners de divulgação (Patreon / WhatsApp / Telegram) */
+html.dnsk-opt-notitle #fullno > div[style*="text-align: center"],
+html.dnsk-opt-notitle #fullno > div[style*="justify-content"],
+html.dnsk-opt-notitle #fullno a[href*="patreon"],
+html.dnsk-opt-notitle #fullno a[href*="whatsapp"],
+html.dnsk-opt-notitle #fullno a[href*="telegram"],
+html.dnsk-opt-notitle #fullno video,
+html.dnsk-opt-notitle .btn_patreon {
+  display: none !important;
+}
+
+/* comentários (wpDiscuz) */
+html.dnsk-opt-nocomments .comments-area,
+html.dnsk-opt-nocomments #comments,
+html.dnsk-opt-nocomments #wpdcom,
+html.dnsk-opt-nocomments .wpd-thread-wrapper,
+html.dnsk-opt-nocomments #respond,
+html.dnsk-opt-nocomments .wpdiscuz_top_clearing,
+html.dnsk-opt-nocomments .related_posts {
+  display: none !important;
+}
+
+/* ============================================================
+   .report-wrapper — o "> " órfão que ocupa uma coluna
+
+   O HTML servido pelo site NÃO contém esse elemento. O
+   openReport() do script.js só chama `.report-wrapper.show()`,
+   então ele é criado em tempo de execução por script de anúncio.
+   O tema estiliza `.report-wrapper .content-wrapper` com
+   `display: table`, e nesse contexto cada filho — inclusive um
+   nó de texto solto — vira uma CÉLULA de tabela. Era por isso
+   que um ">" sozinho aparecia no fim da página ocupando uma
+   coluna inteira.
+
+   Como o botão "Reportar" fica em .mobile_b (já escondido) e
+   o modal nunca é aberto, o arranjo inteiro é descartado.
+   O !important vence o display:table do tema.
+
+   Amarrado ao gate mestre (dnsk-active): o ">" é artefato da página,
+   não conteúdo, então some sempre que a limpeza está ativa —
+   independente das opções de comentários/anúncios.
+   ============================================================ */
+html.dnsk-active .report-wrapper,
+html.dnsk-active .report-wrapper * {
+  display: none !important;
+}
+
+/* rodapé, créditos, navegação legal, bolha de comentários */
+html.dnsk-opt-nocomments footer.footer,
+html.dnsk-opt-nocomments .creditos,
+html.dnsk-opt-nocomments nav.legal-nav,
+html.dnsk-opt-nocomments .legal-nav small,
+html.dnsk-opt-nocomments .wpd-bubble-wrapper,
+html.dnsk-opt-nocomments #wpdUserContentInfo,
+html.dnsk-opt-nocomments #wpd-editor-source-code-wrapper,
+html.dnsk-opt-nocomments #wpd-editor-source-code-wrapper-bg {
+  display: none !important;
+}
+
+/* =====================================================================
+   4. ANÚNCIOS
+   ======================================== */
+html.dnsk-opt-noads ins[class*="adsbygoogle"],
+html.dnsk-opt-noads .adsbygoogle,
+html.dnsk-opt-noads [id^="mgw"],
+html.dnsk-opt-noads [id^="MarketGid"],
+html.dnsk-opt-noads [id^="div-gpt-ad"],
+html.dnsk-opt-noads [id^="cbox"],
+html.dnsk-opt-noads #colorbox,
+html.dnsk-opt-noads #cboxOverlay,
+html.dnsk-opt-noads .CboxButton,
+html.dnsk-opt-noads template,
+html.dnsk-opt-noads #multisync-iframe,
+html.dnsk-opt-noads #google_esf,
+html.dnsk-opt-noads iframe[src*="doubleclick.net"],
+html.dnsk-opt-noads iframe[src*="googlesyndication"],
+html.dnsk-opt-noads iframe[src*="rubiconproject"],
+html.dnsk-opt-noads iframe[src*="recaptcha"],
+html.dnsk-opt-noads iframe[id="google_esf"],
+html.dnsk-opt-noads style[id^="ssp_doubleclick"],
+html.dnsk-opt-noads style[id^="new-mcvideo-styles"],
+html.dnsk-opt-noads .adsterra,
+html.dnsk-opt-noads .ad-container {
+  display: none !important;
+}
+
+/* =====================================================================
+   5. CONTROLES
+   ======================================== */
+html.dnsk-opt-wide .mobile_b,
+html.dnsk-opt-wide .controles {
+  background: #111 !important;
+  border-top: 1px solid #262626 !important;
+}
+
+html.dnsk-opt-wide .controles {
+  margin: 0 !important;
+  padding: 8px 10px !important;
+}
+
+/* modo "somente player": esconde os controles e usa a altura da janela */
+html.dnsk-opt-onlyplayer .mobile_b,
+html.dnsk-opt-onlyplayer .controles,
+html.dnsk-opt-onlyplayer nav.legal-nav {
+  display: none !important;
+}
+
+html.dnsk-opt-onlyplayer #playVideo {
+  /* aspect-ratio ignorado: a altura vem do padding-top acima */
+  padding-top: 0 !important;
+  height: 100vh !important;
+}
+
+html.dnsk-opt-onlyplayer #playVideo iframe {
+  height: 100vh !important;
+}
+
+/* =====================================================================
+   6. MODO TEATRO
+
+   Ativado pelo botão flutuante (injetado em Shadow DOM) ou pela tecla T.
+   Esconde TUDO — inclusive os controles do site — e deixa o vídeo
+   ocupando 100vw x 100vh. Nada mais é clicável na página.
+   ===================================================================== */
+
+html.dnsk-theater,
+html.dnsk-theater body {
+  background: #000 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+}
+
+/* remove todo o chrome: header, menu, rodapé, sidebar, recomendados,
+   comentários, anúncios, controles do site e a miniatura */
+html.dnsk-theater header,
+html.dnsk-theater .m_menu,
+html.dnsk-theater .separador,
+html.dnsk-theater .menu_open,
+html.dnsk-theater footer.footer,
+html.dnsk-theater .creditos,
+html.dnsk-theater nav.legal-nav,
+html.dnsk-theater .legal-nav small,
+html.dnsk-theater .mobile_b,
+html.dnsk-theater .controles,
+html.dnsk-theater .article_title,
+html.dnsk-theater .rwl .crw,
+html.dnsk-theater #list_eps,
+html.dnsk-theater .sidebar,
+html.dnsk-theater .postsNew,
+html.dnsk-theater .widget_recent_entries,
+html.dnsk-theater .recent-posts-2,
+html.dnsk-theater .sliderRecomendado,
+html.dnsk-theater .titleC,
+html.dnsk-theater .comments-area,
+html.dnsk-theater #comments,
+html.dnsk-theater #wpdcom,
+html.dnsk-theater .wpd-thread-wrapper,
+html.dnsk-theater #respond,
+html.dnsk-theater .wpdiscuz_top_clearing,
+html.dnsk-theater .wpd-bubble-wrapper,
+html.dnsk-theater .related_posts,
+html.dnsk-theater .videoFull,
+html.dnsk-theater .js_video_main,
+html.dnsk-theater #thumbHis,
+html.dnsk-theater #light,
+html.dnsk-theater #fullno > div[style*="text-align: center"],
+html.dnsk-theater #fullno > div[style*="justify-content"],
+html.dnsk-theater #fullno a[href*="patreon"],
+html.dnsk-theater #fullno a[href*="whatsapp"],
+html.dnsk-theater #fullno a[href*="telegram"],
+html.dnsk-theater #fullno video {
+  display: none !important;
+}
+
+/* a coluna de conteúdo ocupa a tela inteira */
+html.dnsk-theater .m_center,
+html.dnsk-theater .rwl,
+html.dnsk-theater .clw,
+html.dnsk-theater #fullno {
+  display: block !important;
+  width: 100% !important;
+  max-width: none !important;
+  height: 100vh !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  overflow: hidden !important;
+}
+
+/* o vídeo em tela cheia */
+html.dnsk-theater #player {
+  display: block !important;
+  position: relative !important;
+  width: 100% !important;
+  height: 100vh !important;
+  padding-top: 0 !important;
+  background: #000 !important;
+}
+
+html.dnsk-theater #playVideo {
+  display: block !important;
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  padding: 0 !important;
+  padding-top: 0 !important;
+  aspect-ratio: auto !important;
+  background: #000 !important;
+  overflow: hidden !important;
+  z-index: 2147483000 !important;
+}
+
+html.dnsk-theater #playVideo iframe {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  border: 0 !important;
+  margin: 0 !important;
+  transform: none !important;
+  zoom: 1 !important;
+}
+
+/* enquanto o modo teatro está ligado, o ponteiro do cursor vira o
+   "sair do teatro" ao passar sobre o vídeo (feedback visual leve) */
+html.dnsk-theater #playVideo {
+  cursor: none;
+}
+
+html.dnsk-theater #playVideo:hover {
+  cursor: default;
+}

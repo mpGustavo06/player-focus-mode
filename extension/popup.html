@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="utf-8">
+  <style>
+    :root {
+      color-scheme: light dark;
+    }
+
+    body {
+      width: 290px;
+      margin: 0;
+      padding: 14px;
+      font: 13px/1.45 "Segoe UI", system-ui, sans-serif;
+      background: #1a1a1a;
+      color: #eee;
+    }
+
+    h1 {
+      margin: 0 0 4px;
+      font-size: 14px;
+    }
+
+    .sub {
+      margin: 0 0 12px;
+      font-size: 11px;
+      opacity: .65;
+    }
+
+    label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 0;
+      cursor: pointer;
+    }
+
+    input[type="checkbox"] {
+      width: 15px;
+      height: 15px;
+      accent-color: #dc143c;
+      flex: 0 0 auto;
+    }
+
+    .sep {
+      height: 1px;
+      background: #333;
+      margin: 10px 0;
+    }
+
+    footer {
+      margin-top: 10px;
+      font-size: 11px;
+      opacity: .6;
+    }
+
+    a {
+      color: #6ea8fe;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>DNSK Player Only</h1>
+  <p class="sub">Deixa apenas o player de vídeo na tela.</p>
+
+  <label><input type="checkbox" data-key="enabled"> Ativar limpeza</label>
+  <label><input type="checkbox" data-key="onlyOnPlayerPages"> Só nas páginas com player</label>
+
+  <div class="sep"></div>
+
+  <label><input type="checkbox" data-key="hideHeader"> Remover cabeçalho e busca</label>
+  <label><input type="checkbox" data-key="hideTitleBlock"> Remover título / data / views</label>
+  <label><input type="checkbox" data-key="hideComments"> Remover comentários</label>
+  <label><input type="checkbox" data-key="hidePlayerControls"> Só o player (esconder controles)</label>
+
+  <div class="sep"></div>
+
+  <label><input type="checkbox" data-key="theaterMode"> Modo teatro</label>
+
+  <label><input type="checkbox" data-key="hideAds"> Remover anúncios</label>
+  <label><input type="checkbox" data-key="blockPopups"> Bloquear popups / smartlink</label>
+  <label><input type="checkbox" data-key="widePlayer"> Player em tela cheia (16:9)</label>
+
+  <footer>
+    Recarregue a aba do vídeo para aplicar.<br>
+    Na página do vídeo: <b>T</b> liga/desliga o modo teatro, <b>Esc</b> sai dele.<br>
+    <span id="ver">v?</span> &mdash; confira aqui se a extens&atilde;o recarregou.
+  </footer>
+
+  <script src="popup.js"></script>
+</body>
+
+</html>

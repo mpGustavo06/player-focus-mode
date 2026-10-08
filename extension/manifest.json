@@ -1,0 +1,81 @@
+{
+  "manifest_version": 3,
+  "name": "DNSK Player Only",
+  "version": "1.9.1",
+  "description": "Remove todo o layout do donghuanosekai.com e deixa apenas o player de video na tela.",
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "permissions": [
+    "storage",
+    "declarativeNetRequest"
+  ],
+  "host_permissions": [
+    "*://donghuanosekai.com/*",
+    "*://*.donghuanosekai.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "DNSK Player Only",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "*://donghuanosekai.com/*",
+        "*://*.donghuanosekai.com/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "css": [
+        "content.css"
+      ],
+      "run_at": "document_start",
+      "all_frames": false
+    },
+    {
+      "matches": [
+        "*://donghuanosekai.com/*",
+        "*://*.donghuanosekai.com/*"
+      ],
+      "js": [
+        "blocker.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN",
+      "all_frames": false
+    },
+    {
+      "matches": [
+        "*://donghuanosekai.com/*",
+        "*://*.donghuanosekai.com/*"
+      ],
+      "js": [
+        "player-bar.js"
+      ],
+      "run_at": "document_idle",
+      "all_frames": true
+    }
+  ],
+  "declarative_net_request": {
+    "rule_resources": [
+      {
+        "id": "ad_block",
+        "enabled": true,
+        "path": "rules/ad-block.json"
+      }
+    ]
+  }
+}
