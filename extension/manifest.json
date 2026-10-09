@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Player Focus Mode",
-  "version": "2.5.3",
+  "version": "2.6.1",
   "description": "Deixa apenas o player de video na tela, removendo cabecalho, sidebar, comentarios e anuncios. Suporta donghuanosekai.com e animesdrive.cloud.",
   "icons": {
     "16": "icons/icon16.png",

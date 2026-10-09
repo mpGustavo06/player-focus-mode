@@ -50,6 +50,12 @@
   let next = false;
   let ui = null;
 
+  /* última posição conhecida do ponteiro, em coordenadas de tela.
+     Usada para decidir se o botão deve continuar à vista: com o
+     cursor sobre o player (que é um iframe), nenhum evento chega
+     aqui, então perguntamos à posição, não ao evento. */
+  const mouse = { x: -1, y: -1, at: -1e9 };
+
   /* ---------- onde a barra de controles costuma ficar ---------- */
 
   const CONTROL_BARS = [
@@ -260,116 +266,152 @@
     }
   };
 
-  const findAnchorBox = () => {
-    const video = document.querySelector("video");
-    if (video && video.parentElement) return video.parentElement;
+  /* Onde o vídeo aparece na tela.
 
-    /* o perfil sabe melhor que a heurística */
+     Devolve a CAIXA do player (a stage), nunca o <video> nem o iframe.
+     O botão não é filho dessa caixa: ele vive no <body> e é
+     posicionado por conta própria a partir deste retângulo (ver
+     positionOverStage). Assim o site pode recriar o player, trocar a
+     fonte ou recarregar o iframe à vontade — nada disso leva o botão
+     junto, porque ele não está dentro. */
+  const findAnchorBox = () => {
+    /* 1) a stage que o perfil declarou */
     const byProfile = anchorFromProfile();
     if (byProfile) return byProfile;
 
-    const frames = document.querySelectorAll("iframe");
-
-    /* NÃO basta o primeiro iframe: a página tem iframes de anúncio
-       antes do player. Preferimos o que está dentro de um container
-       de player. */
-    let target = null;
-    for (let i = 0; i < frames.length; i++) {
-      const f = frames[i];
-      const holder = f.parentElement;
-      const sig = (
-        (holder && holder.className ? holder.className : "") +
-        " " +
-        (f.className || "") +
-        " " +
-        (f.id || "")
-      ).toLowerCase();
-      if (/player|stage|video|embed/.test(sig)) {
-        target = f;
-        break;
+    /* 2) <video>: subimos até a primeira caixa com área */
+    const video = document.querySelector("video");
+    if (video && video.parentElement) {
+      let up = video.parentElement;
+      let g = 0;
+      while (up && up !== document.body && g < 8) {
+        const r = up.getBoundingClientRect();
+        if (r.width > 40 && r.height > 40) return up;
+        up = up.parentElement;
+        g++;
       }
     }
-    if (!target && frames.length) target = frames[0];
-    if (!target) return null;
 
-    /* SUBIR até um container de verdade.
-
-       Este era o bug que escondia o botão no animesdrive. A cadeia do
-       player é:
-
-           iframe → .animeo-player__media   (0x0, fonte inativa)
-                  → .animeo-player__source  (0x0)
-                  → .animeo-player__stage   (1125x633, a caixa visível)
-
-       A âncora parava no .media, que tem área zero — o botão ficava
-       montado num lugar invisível. Subindo até a primeira caixa com
-       tamanho real, cai na stage, que é onde o vídeo aparece. */
-    let box = target.parentElement;
-    let guard = 0;
-    while (box && box !== document.body && box !== document.documentElement && guard < 8) {
-      const r = box.getBoundingClientRect();
-      if (r.width > 40 && r.height > 40) return box;
-      box = box.parentElement;
-      guard++;
+    /* 3) marcação de player conhecida */
+    const marks =
+      ".animeo-player__stage," +
+      ".animeo-watch-main-v22," +
+      ".vjs-tech," +
+      "#playVideo," +
+      "#player," +
+      "[class*='player__stage']," +
+      "[class*='player-stage']";
+    for (const m of marks.split(",")) {
+      const el = document.querySelector(m.trim());
+      if (!el) continue;
+      const r = el.getBoundingClientRect();
+      if (r.width > 40 && r.height > 40) return el;
     }
+
     return null;
   };
 
-  const placeIn = (host, box) => {
-    /* o absolute precisa de um containing block posicionado */
-    try {
-      if (window.getComputedStyle(box).position === "static") {
-        box.style.position = "relative";
-      }
-    } catch (e) {
-      /* getComputedStyle indisponível */
+  /* Largura/altura reservadas, para o cálculo do canto funcionar já no
+     primeiro quadro, antes de o shadow root ter sido laid out. */
+  const BTN_EST_W = 95;
+  const BTN_EST_H = 24;
+
+  /* ---------- posicionamento ----------
+
+     O botão fica NO <body>, com position:fixed, e a cada 250ms
+     recalculamos top/right a partir do retângulo da caixa do vídeo.
+
+     Por que não dentro do player: ancorado dentro, o botão era
+     destruído junto com o player. O animesdrive recria a stage ao
+     trocar de fonte, recarrega o iframe do vídeo e chega a montar a
+     .animeo-player__media com 0x0 — em qualquer desses momentos o
+     botão ficava invisível ou ia parar no canto da página. Como
+     agora ele não é filho de nada que o site controle, sobrevive a
+     tudo isso. */
+  const positionOverStage = (host) => {
+    const box = findAnchorBox();
+    if (!box) {
+      /* sem player na tela: esconde, mas continua montado */
+      host.style.visibility = "hidden";
+      return false;
     }
-    box.appendChild(host);
+
+    const r = box.getBoundingClientRect();
+
+    const w = host.offsetWidth || BTN_EST_W;
+
+    /* O canto superior direito do vídeo é o ponto de ancoragem.
+       Se ele sair da janela, o botão esconde — em vez de grudar no
+       topo. Antes usávamos Math.max(0, ...) para não gerar top
+       negativo, e era exatamente isso que prendia o botão na borda
+       superior enquanto a página rolava. */
+    const ax = r.right - w - BTN_RIGHT;
+    const ay = r.top + BTN_TOP;
+
+    const dentroDaTela =
+      ay >= 0 && ay <= window.innerHeight - 20 &&
+      ax >= 0 && ax <= window.innerWidth;
+
+    if (!dentroDaTela) {
+      host.style.visibility = "hidden";
+      return false;
+    }
+    host.style.visibility = "visible";
+
+    host.style.top = Math.round(ay) + "px";
+    host.style.left = Math.round(ax) + "px";
+    return true;
   };
 
   const anchorToVideo = (host) => {
-    const box = findAnchorBox();
-    if (!box || box === document.body) {
-      document.body.appendChild(host);
-      return;
-    }
-    placeIn(host, box);
+    /* sempre no <body>: é o único lugar que o site não reconstrói */
+    document.body.appendChild(host);
+    positionOverStage(host);
   };
 
-  /* player-bar.js roda em document_idle, e no animesdrive o iframe do
-     player nem sempre existe nesse instante: o site monta o player por
-     JS depois. O botão nasce no <body> — canto da PÁGINA, longe do
-     vídeo — e, como `ui` já estava preenchido, nunca mais se movia.
-
-     Aqui puxamos o botão para o container do player assim que ele
-     existir. Só age enquanto o botão estiver no <body>: ancorado no
-     player de verdade, não mexe mais. */
+  /* Sem argumento: usa o botão atual. O observer e o watchdog chamam
+     reanchor() sem passar nada, e antes positionOverStage era chamada
+     com host explícito — daí o "undefined is not an object" quando
+     o botão ainda não existia. */
   const reanchor = () => {
     if (!ui || !ui.isConnected) return;
-    const box = findAnchorBox();
-    /* Sem condição de tamanho aqui de propósito: o único jeito de o
-       botão ficar invisível é estar num container sem área, e
-      oir findAnchorBox() sozinho não garante que o alvo certo já
-       exista. Reprocessar a cada 2s converge assim que a stage
-       aparece. */
-    if (box && box !== ui.parentElement) placeIn(ui, box);
+    positionOverStage(ui);
   };
 
   /* ---------- o botão ---------- */
+
+  /* O cursor está sobre o player?
+
+     Vive fora do buildUI de propósito: o botão pode ser construído
+     mais de uma vez, e um timer do buildUI anterior sobrevivia ao
+     escopo dele, referenciava uma variável já destruída e derrubava o
+     botão com ReferenceError. Aqui só usamos `ui` e a caixa real. */
+  const RECENT_MS = 2000;
+
+  const pointerInsidePlayer = () => {
+    const box = findAnchorBox();
+    if (!box) return false;
+    const r = box.getBoundingClientRect();
+    if (!r.width || !r.height) return false;
+
+    if (mouse.x >= r.left && mouse.x <= r.right &&
+        mouse.y >= r.top && mouse.y <= r.bottom) return true;
+
+    return Date.now() - mouse.at < RECENT_MS;
+  };
 
   const buildUI = () => {
     const host = document.createElement("div");
     host.id = BTN_ID;
 
-    /* O botão fica sempre no canto superior direito do vídeo, ancorado
-       ao container do <video> (ver anchorToVideo). Não entra mais no
-       fluxo da barra de controles, que fica na parte de baixo. */
+    /* position:fixed no <body>, com top/left recalculados a partir da
+       caixa do vídeo. Fica FORA do player de propósito: o site
+       recria a stage e recarrega o iframe, e o botão acompanha sem
+       ser filho de nada que o site controle. */
     host.style.cssText =
-      "position:absolute;top:" +
-      BTN_TOP +
-      "px;right:" +
-      BTN_RIGHT +
-      "px;z-index:2147483000;opacity:1;transition:opacity .35s ease;";
+      "position:fixed;top:0;left:0;" +
+      "z-index:2147483000;opacity:1;transition:opacity .35s ease;" +
+      "will-change:top,left;";
 
     const root = host.attachShadow({ mode: "open" });
 
@@ -425,57 +467,81 @@
 
     /* ---------- auto-hide ----------
 
-       O botão desaparece sozinho depois de HIDE_AFTER_MS sem
-       atividade, e volta com qualquer movimento do mouse sobre o
-       frame em que ele está. Na primeira aparição ele fica mais
-       tempo à vista (FIRST_SHOW_MS) para ser notado. */
-    /* Auto-hide por ATIVIDADE, não por "saiu da área".
+       O botão some sozinho depois de HIDE_AFTER_MS sem atividade.
 
-       A versão anterior dependia de mouseleave na caixa do player.
-       Isso não funciona: quando o cursor está sobre o vídeo, ele está
-       dentro de um iframe, e o iframe não propaga mouseleave para o
-       documento pai — o botão aparecia no hover e nunca mais sumia.
+       O detalhe que quebrou o botão por semanas: ele fica DENTRO de
+       um iframe (no animesdrive, .animeo-player__media É o iframe do
+       player). Com o cursor sobre o vídeo, NENHUM evento chega ao
+       documento pai — verificamos no navegador: entrar na caixa do
+       iframe não dispara mouseenter, mouseover nem mousemove no pai.
+       Então o botão aparecia no primeiro hover e nunca voltava.
 
-       Aqui o botão esconde depois de HIDE_AFTER_MS sem NENHUMA
-       atividade (movimento do mouse, toque, tecla ou rolagem) neste
-       documento, e volta a aparecer na hora que houver qualquer uma.
-       É determinístico: funciona dentro e fora de iframe. */
-    let lastActivity = Date.now();
+       Por isso a decisão de esconder é feita por POSIÇÃO, não por
+       evento: guardamos a última posição conhecida do ponteiro e a
+       comparamos com a caixa do player num rAF. Se o cursor está
+       dentro, o botão fica à vista; se saiu, o timer de
+       HIDE_AFTER_MS corre.
+
+       A posição do mouse é capturada em document, e supplementada por
+       mouseover no pai — que é o que cobre a travessia de um iframe
+       para outro. */
+    host.__last = Date.now();
+
+    /* A primeira aparição dura FIRST_SHOW_MS; depois, HIDE_AFTER_MS.
+       Uma variável só, para o timer não aplicar o prazo curto antes da
+       hora — foi o que deixava o botão com 1,5s de vida em vez de 3s. */
+    host.__limite = FIRST_SHOW_MS;
 
     const show = () => {
-      lastActivity = Date.now();
+      host.__last = Date.now();
       host.style.opacity = "1";
+      clearTimeout(host.__hideTimer);
     };
 
-    const touch = () => {
-      lastActivity = Date.now();
-      host.style.opacity = "1";
+    /* enquanto o cursor estiver dentro da área do player, fica à vista
+       e não conta o tempo */
+    const tick = () => {
+      if (!host.__mounted) return;          // host descartado: para
+      /* reposiciona: o player pode mover, redimensionar ou ser
+         recriado, e o botão tem de acompanhar */
+      positionOverStage(host);
+      if (pointerInsidePlayer()) {
+        host.__last = Date.now();
+        host.style.opacity = "1";
+      } else if (Date.now() - host.__last >= host.__limite) {
+        host.style.opacity = "0";
+        host.__limite = HIDE_AFTER_MS;
+      }
+      host.__tick = setTimeout(tick, 250);
     };
 
-    const events = ["mousemove", "mouseover", "pointermove", "touchstart", "keydown", "wheel"];
-    events.forEach((ev) =>
-      document.addEventListener(ev, touch, { passive: true })
+    /* a posição do ponteiro, capturada no documento */
+    const track = (ev) => {
+      mouse.x = ev.clientX;
+      mouse.y = ev.clientY;
+      mouse.at = Date.now();
+      show();
+    };
+    ["mousemove", "pointermove", "mouseover", "pointerover"].forEach((ev) =>
+      document.addEventListener(ev, track, { passive: true })
     );
+    ["touchstart", "keydown", "wheel"].forEach((ev) =>
+      document.addEventListener(ev, show, { passive: true })
+    );
+
     host.addEventListener("mouseenter", show);
     host.addEventListener("mousemove", show);
 
-    /* A primeira aparição dura FIRST_SHOW_MS, para o botão ser
-       notado; depois valem os HIDE_AFTER_MS normais. */
-    let limit = FIRST_SHOW_MS;
-
-    /* Rede de segurança: mesmo sem nenhum evento, o botão some.
-       Um setTimeout de-la sozinho não sobrevive a um player que
-       reconstrói o próprio DOM. */
-    setInterval(() => {
-      if (Date.now() - lastActivity < limit) {
-        host.style.opacity = "1";
-      } else {
-        host.style.opacity = "0";
-        limit = HIDE_AFTER_MS;
-      }
-    }, 300);
-
-    lastActivity = Date.now();
+    host.__last = Date.now();
+    host.__mounted = true;
+    /* setTimeout e não requestAnimationFrame: o rAF e pausado quando a
+       aba vai para segundo plano, e o botao ficaria travado visivel
+       (ou invisivel, se ja estivesse oculto). */
+    host.__tick = setTimeout(tick, 250);
+    host.__stopTick = () => {
+      host.__mounted = false;
+      clearTimeout(host.__tick);
+    };
 
     return host;
   };
@@ -495,6 +561,17 @@
     if (!document.body) return;
     if (!isPlayerFrame()) return;
 
+    /* mountIfWinner pode ser chamado duas vezes seguidas (o storage
+       e o observer disparam juntos). Sem esta trava, dois buildUI()
+       rodavam, o segundo substituía `ui`, e o timer do primeiro
+       continuava vivo referencing um escopo que ja saiu —
+       daí o "lastActivity is not defined" que derrubava o botão.
+
+       O botão é encontrado pelo id, então o segundo mount encontra o
+       host do primeiro e reaproveita, sem criar outro. */
+    const built = document.getElementById(BTN_ID);
+    if (built) return;
+
     /* Reaproveita um host já existente — MAS só se for realmente
        nosso. Um div órfão com esse id (sobrou de uma renderização
        antiga, ou veio no HTML salvo) não tem shadow root nem botão:
@@ -503,6 +580,8 @@
     const already = document.getElementById(BTN_ID);
     if (already && already.shadowRoot && already.shadowRoot.querySelector(".t")) {
       ui = already;
+      /* o tick pode ter parado quando o host foi desconectado */
+      if (!already.__mounted) already.__mounted = true;
       paint();
       return;
     }
@@ -675,6 +754,10 @@ const mountIfWinner = async () => {
      a gente remontaria — mas só se o árbitro liberar. Por isso avisamos
      o árbitro de que o botão anterior não existe mais. */
   setInterval(() => {
+    if (ui && !ui.isConnected && ui.__tick) {
+      clearTimeout(ui.__tick);
+      ui.__tick = null;
+    }
     reanchor();
     if (ui && !ui.isConnected) {
       ui = null;
