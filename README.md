@@ -1,7 +1,9 @@
 # Player Focus Mode
 
-Extensão para navegadores Chromium que limpa a página de vídeo do
-**donghuanosekai.com** e deixa **somente o player** na tela.
+Extensão para navegadores Chromium que limpa a página de vídeo e deixa
+**somente o player** na tela.
+
+Sites suportados: **donghuanosekai.com** e **animesdrive.cloud**.
 
 Sem cabeçalho, sem sidebar, sem comentários, sem anúncios e sem
 recomendações — só o vídeo e os controles que você quiser.
@@ -127,7 +129,8 @@ extension/
 │   └── arbiter.js      # coordena o botão entre iframes
 ├── sites/              # um perfil por site
 │   ├── index.js
-│   └── donghuanosekai.js
+│   ├── donghuanosekai.js
+│   └── animesdrive.js
 ├── content.js          # orquestrador
 ├── player-bar.js       # botão de teatro dentro do player
 ├── background.js
@@ -140,7 +143,8 @@ tudo no perfil correspondente.
 
 ### Adicionar um site novo
 
-1. Copie `sites/donghuanosekai.js` para `sites/meusite.js` e ajuste:
+1. Copie `sites/donghuanosekai.js` ou `sites/animesdrive.js` para
+   `sites/meusite.js` e ajuste:
 
 ```js
 PFM.registerSite({
@@ -175,6 +179,28 @@ PFM.registerSite({
 2. Acrescente `"sites/meusite.js"` na lista `js` do content script em
    `manifest.json`, **antes** de `content.js`
 3. Acrescente o domínio em `matches` e em `host_permissions`
+
+O campo `player.collapseOtherChildren` merece atenção: ele controla se
+os outros filhos da caixa do player são escondidos. Deixe `true` quando
+a caixa só tem a stage e sobras (como no DNSK) e `false` quando há
+blocos legítimos ao lado dela (como no animesdrive, onde ficam os
+seletores de servidor).
+
+---
+
+## O que é removido em cada site
+
+**donghuanosekai.com** — cabeçalho, título/data/views, lista de
+episódios, recomendados, comentários, rodapé, anúncios, botão de
+expandir, modal de reportar e o caractere `<` órfão
+
+**animesdrive.cloud** — cabeçalho, breadcrumb, painel de episódios,
+cartão de pontos, caixa de descrição, galeria, comentários, rodapé,
+painel lateral, pop-ups do site e a folha de bloqueio de anúncios de
+~40.000 caracteres que o site injeta como texto antes do `<html>`
+
+Em ambos permanece o player, a troca de servidores/controles, a
+navegação de episódios e o download.
 
 ---
 

@@ -6,8 +6,7 @@ const DEFAULTS = {
   hideComments: true,
   hideAds: true,
   blockPopups: true,
-  widePlayer: true,
-  theaterMode: false
+  widePlayer: true
 };
 
 chrome.runtime.onInstalled.addListener(async () => {

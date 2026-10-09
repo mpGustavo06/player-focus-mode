@@ -54,6 +54,34 @@
     return list ? `${list}{display:none!important}` : "";
   };
 
+  /* O css cru do perfil vem escrito pelo autor, sem gate. Aplicamos o
+     gate automaticamente para cada seletor, senão essa parte
+     escaparia da proteção e valeria em páginas onde a extensão não
+     deveria agir (home, listagens). */
+  const gateRawCss = (raw, gate) => {
+    /* Os comentários precisam sair ANTES de fatiar as regras. Se um
+       comentário ficar colado no seletor, ele vira parte dele e a
+       regra deixa de casar na pagina. */
+    const clean = String(raw).replace(/\/\*[\s\S]*?\*\//g, "");
+    const rules = clean.match(/[^{}]+\{[^{}]*\}/g) || [];
+    return rules
+      .map((rule) => {
+        const brace = rule.indexOf("{");
+        const selector = rule.slice(0, brace).trim();
+        const body = rule.slice(brace);
+        const gated = selector
+          .split(",")
+          .map((part) => {
+            const t = part.trim();
+            return t ? `${gate} ${t}` : "";
+          })
+          .filter(Boolean)
+          .join(",");
+        return gated + body;
+      })
+      .join("\n");
+  };
+
   /* rede de segurança: nenhum seletor pode escapar do gate */
   const findUngated = (css) => {
     const bad = [];
@@ -64,7 +92,12 @@
       for (const part of selector.split(",")) {
         const s = part.trim();
         if (!s) continue;
-        if (!/^html\.pfm-(active|opt-|theater)/.test(s)) bad.push(s);
+        /* `html.pfm-theater.pfm-theater-on` e `html.pfm-active ...`
+           sao formas validas de gate. */
+        /* O gate precisa começar por html.pfm-<algo>. Formas
+           válidas: html.pfm-active X, html.pfm-opt-wide X,
+           html.pfm-theater.pfm-theater-on X. */
+        if (!/^html\.pfm-[\w-]+[.\[:\s]/.test(s) && !/^html\.pfm-[\w-]+$/.test(s)) bad.push(s);
       }
     }
     return bad;
@@ -78,7 +111,17 @@
     const gate = "html.pfm-active";
     const wide = "html.pfm-opt-wide";
     const only = "html.pfm-opt-onlyplayer";
-    const th = "html.pfm-theater";
+    /* O teatro precisa vencer o layout do perfil sem depender da
+       ordem das regras. `html.pfm-theater X` e `html.pfm-active X`
+       empatam em especificidade (0,2,1), e aí quem decide é a ordem
+       no stylesheet — e o CSS do perfil é emitido por último.
+
+       Por isso o teatro carrega uma classe extra: com
+       `html.pfm-theater` são (0,2,1), empatando com o perfil; com
+       `html.pfm-theater.pfm-theater-on` são (0,3,1) e o teatro ganha
+       de qualquer regra do perfil, em qualquer ordem. As duas classes
+       vão no <html> (content.js usa document.documentElement). */
+    const th = "html.pfm-theater.pfm-theater-on";
 
     /* ---------- o que sempre some ---------- */
     out.push(hideRule(gate, p.hide.always));
@@ -116,9 +159,14 @@
     out.push(
       `${wide} ${box}{width:100%!important;max-width:none!important;margin:0!important;background:#000!important;padding-top:0!important}`
     );
-    out.push(
-      `${wide} ${box} > *:not(${stage}){position:absolute!important;width:0!important;height:0!important;overflow:hidden!important;visibility:hidden!important;margin:0!important;padding:0!important}`
-    );
+    /* Alguns sites deixam hijos legítimos na caixa ao lado da stage
+       (no animesdrive, o bloco de servidores). Escondê-los quebraria
+       a interface, então isso é opt-in por perfil. */
+    if (p.player.collapseOtherChildren !== false) {
+      out.push(
+        `${wide} ${box} > *:not(${stage}){position:absolute!important;width:0!important;height:0!important;overflow:hidden!important;visibility:hidden!important;margin:0!important;padding:0!important}`
+      );
+    }
     out.push(
       `${wide} ${stage}{position:relative!important;width:100%!important;max-height:none!important;aspect-ratio:16/9!important;margin:0!important;overflow:hidden!important}`
     );
@@ -151,8 +199,20 @@
       ...(p.controls || [])
     ];
     out.push(hideRule(th, theaterHide));
+    /* `overflow:hidden` sozinho NÃO basta. O documento continua com a
+       altura do conteúdo (no animesdrive, 945px numa tela de 900px):
+       overflow:hidden corta a ROLAGEM, mas não impede o elemento de
+       crescer. Com a rolagem cortada e a página maior que a tela, o
+       player fixo em 100vh fica deslocado e o vídeo parece maior que
+       a janela.
+
+       Por isso travamos a altura também. */
     out.push(
-      `${th},${th} body{background:#000!important;margin:0!important;padding:0!important;overflow:hidden!important}`
+      `${th},${th} body{` +
+        `background:#000!important;margin:0!important;padding:0!important;` +
+        `overflow:hidden!important;` +
+        `height:100vh!important;max-height:100vh!important;min-height:0!important;` +
+        `width:100vw!important;max-width:100vw!important}`
     );
     for (const sel of [p.layout.column, p.layout.row, p.layout.cell]) {
       if (!sel) continue;
@@ -160,21 +220,101 @@
         `${th} ${sel}{display:block!important;width:100%!important;max-width:none!important;height:100vh!important;padding:0!important;margin:0!important;overflow:hidden!important}`
       );
     }
+
+
+    /* `position:static` no container do player.
+
+       Ele era `position:relative`, e isso importa: um ancestral
+       posicionado vira containing block para os `position:fixed` da
+       stage. A partir daí, `left:0` deixa de significar "borda da
+       janela" e passa a significar "borda do container" — que já
+       está deslocada pelo respiro lateral do layout. A stage saía em
+       x=12 e transbordava 12px à direita.
+
+       No teatro o player ocupa a janela inteira, então o container
+       não precisa se posicionar: ele só precisa existir. */
     out.push(
-      `${th} ${box}{display:block!important;position:relative!important;width:100%!important;height:100vh!important;padding-top:0!important;background:#000!important}`
+      `${th} ${box}{` +
+        `display:block!important;position:static!important;` +
+        `width:100%!important;max-width:none!important;` +
+        `height:100vh!important;min-height:0!important;` +
+        `padding:0!important;padding-top:0!important;margin:0!important;` +
+        `background:#000!important;overflow:hidden!important}`
     );
+    /* left/right:0 EXPLICITOS e inset:0.
+
+       A stage vira position:fixed, mas sem `left`, ela é posicionada
+       na posição estática que teria no fluxo — que herda o
+       padding-left de 12px do respiro do #contenedor. Com
+       width:100vw (a largura da janela inteira) mais esse offset, a
+       stage terminava 12px além da borda direita e o vídeo ficava
+       maior que a tela.
+
+       `right:0` resolve: com left e right fixos e width:100vw, o
+       navegador não consegue satisfazer os três, e o left (0) vence,
+       ancorando a caixa exatamente na janela. */
+/* Translação em vez de posicionamento.
+
+       Verificado no animesdrive: mesmo com position:fixed, inset:0,
+       width:100vw e toda a cadeia de ancestrais com padding:0 e
+       position:static, a stage continuava em x=12. Nenhum
+       getComputedStyle dos ancestrais acusava transform, filter,
+       will-change ou contain — mas o Chrome trata a cadeia como
+       containing block e desloca a caixa junto.
+
+       Zenar padding dos ancestrais não resolve, e margin-left
+       negativo também não (o offset é do containing block, não de
+       margem). O que funciona é corrigir a posição final com
+       translateX, que age depois de todo o cálculo de layout e por
+       isso não é anulado pelo deslocamento do ancestral.
+
+       O valor não é chutado: é medido em tempo de aplicação, a
+       partir da posição real da stage, e reaplicado se mudar. */
     out.push(
-      `${th} ${stage}{display:block!important;position:fixed!important;top:0!important;left:0!important;width:100vw!important;height:100vh!important;padding:0!important;aspect-ratio:auto!important;background:#000!important;overflow:hidden!important;z-index:2147483000!important;cursor:none}`
+      `${th} ${stage}{` +
+        `display:block!important;position:fixed!important;` +
+        `inset:0!important;top:0!important;left:0!important;right:0!important;` +
+        `width:100vw!important;max-width:100vw!important;` +
+        `height:100vh!important;max-height:100vh!important;` +
+        `padding:0!important;margin:0!important;` +
+        `aspect-ratio:auto!important;background:#000!important;` +
+        `overflow:hidden!important;z-index:2147483000!important;cursor:none}`
     );
     out.push(
       `${th} ${stage}:hover{cursor:default!important}`
     );
+    /* O conteúdo do player precisa preencher a tela INTEIRA no
+       teatro — sem letterbox e sem object-fit herdado do layout
+       normal (que é 16:9 e deixaria o vídeo cortado ou com barras
+       numa tela de proporção diferente).
+
+       Vale para <video> e para <iframe>: o animesdrive entrega o
+       player por iframe, e antes o teatro dimensionava só o
+       <video>, deixando o iframe com o tamanho do layout comum. */
     out.push(
-      `${th} ${stage} iframe{position:absolute!important;top:0!important;left:0!important;width:100%!important;height:100%!important;border:0!important;margin:0!important;transform:none!important;zoom:1!important}`
+      `${th} ${stage} iframe,${th} ${stage} video{` +
+        `position:absolute!important;top:0!important;left:0!important;` +
+        `width:100%!important;height:100%!important;` +
+        `max-width:none!important;max-height:none!important;` +
+        `min-width:0!important;min-height:0!important;` +
+        `object-fit:contain!important;object-position:center!important;` +
+        `border:0!important;margin:0!important;padding:0!important;` +
+        `transform:none!important;zoom:1!important}`
     );
 
-    /* ---------- CSS cru do site ---------- */
-    if (p.css) out.push(p.css.trim());
+    /* ---------- CSS cru do perfil ----------
+
+       Entra por ÚLTIMO de propósito. O CSS do perfil carrega o
+       layout normal (stage em 16/9, position:relative), e ele é
+      posto DEPOIS das regras de modo teatro. Com a mesma
+       especificidade — `html.pfm-active X` contra `html.pfm-theater X` —
+       quem vence é a ÚLTIMA regra do stylesheet. Se o perfil viesse
+       antes, ele sobrescreveria o teatro e o player voltaria a ficar
+       16:9 e ancorado no fluxo, cortado na tela.
+
+       Regra geral: regras de ESTADO (teatro, só-player) têm de ser
+       emitidas depois das de LAYOUT. */
+    if (p.css) out.push(gateRawCss(p.css, gate));
 
     const css = out.filter(Boolean).join("\n");
 
@@ -190,5 +330,5 @@
     return css;
   };
 
-  PFM.style = { buildCss, findUngated, AD_SELECTORS };
+  PFM.style = { buildCss, findUngated, gateRawCss, AD_SELECTORS };
 })();

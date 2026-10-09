@@ -100,6 +100,37 @@
      Agora isso não é mais problema: quem garante exclusividade é a
      arbitragem (um único arbitrator no frame principal), e ela prefere
      o frame mais interno. */
+  /* Frame principal de sites que EMBUTEM o player num iframe.
+
+     No animesdrive não existe <video> neste frame, e o iframe é de
+     outra origem — ou seja, o content script não roda lá dentro. Se
+     este frame não se致病ar player, o botão nunca nasce.
+
+     O sinal é o próprio iframe: a URL dele costuma apontar para o
+     player, ou o container que a envolve tem "player"/"stage"/"video"
+     no class ou id. */
+  const hasEmbeddedPlayer = () => {
+    try {
+      const frames = document.querySelectorAll("iframe");
+      for (let i = 0; i < frames.length; i++) {
+        const f = frames[i];
+        const src =
+          (f.getAttribute("src") || "") +
+          (f.getAttribute("data-src") || "") +
+          (f.getAttribute("data-file") || "");
+        if (/player|videoplay|embed|stream|m3u8|mp4/i.test(src)) return true;
+
+        const box = f.parentElement;
+        if (!box) continue;
+        const sig = ((box.className || "") + " " + (box.id || "")).toLowerCase();
+        if (/player|stage|video|embed/.test(sig)) return true;
+      }
+      return false;
+    } catch (e) {
+      return false;
+    }
+  };
+
   const isPlayerFrame = () => {
     try {
       if (document.querySelector("video")) return true;
@@ -114,6 +145,20 @@
       const u = (location.pathname || "") + (location.search || "");
       if (/player-nativov2|\/player\?|\/player\/|player\.donghuanosekai/i.test(u))
         return true;
+      if (hasEmbeddedPlayer()) return true;
+
+      /* Página de VÍDEO cujo player ainda não carregou.
+
+         player-bar.js roda em document_idle, e no animesdrive o
+         player é montado por JS depois disso. Sem esta cláusula o
+         isPlayerFrame() falhava, o botão nunca nascia, e o
+         MutationObserver (que só age com `ui` vazio) não tinha o que
+         reavaliar. Passa a valer a URL da página: se o endereço é de
+         uma página de player, esperamos o player aparecer. */
+      const u2 = location.pathname || "";
+      if (/\/(episodio|episodio-?[\w-]*|watch|ver|assistir|player)\b/i.test(u2))
+        return true;
+
       return false;
     } catch (e) {
       return false;
@@ -182,15 +227,96 @@
      o botão fica grudado na tela e rola por cima de outros controles.
      Com `absolute` dentro do container do vídeo, ele acompanha o
      player quando a página rola. */
-  const anchorToVideo = (host) => {
-    const video = document.querySelector("video");
-    if (!video || !video.parentElement) {
-      document.body.appendChild(host);
-      return;
-    }
+  /* Procura o container do player neste frame.
 
-    const box = video.parentElement;
-    // o absolute precisa de um containing block posicionado
+     1) o <video> e seu pai, quando estamos no frame que o contém;
+     2) o pai do iframe do player, para sites que embutem o player
+        (animesdrive).
+
+     Devolve null quando ainda não há player — o botão fica no <body>
+     e é movido depois por reanchor(). */
+  /* O perfil do site declara onde está a stage do player. Ele é
+     autoritativo: adivinhar pela marcação do iframe erra, porque no
+     animesdrive a .animeo-player__source e a .animeo-player__media
+     são 0x0 e a walk-up pode parar na caixa errada (ou ficar sem
+     destino). PFM.sites não existe neste frame, então usamos o que o
+     content.js publicou no <html> — ou, se não houver, caímos na
+     heurística. */
+  let cachedStage = null;
+
+  const anchorFromProfile = () => {
+    /* 1) já avons perguntado ao frame principal (vale para os dois
+          sites: so o frame principal carrega o perfil) */
+    const sel = (cachedStage || "").trim();
+    if (!sel) return null;
+    try {
+      const el = document.querySelector(sel);
+      if (!el) return null;
+      const r = el.getBoundingClientRect();
+      /* só serve se for uma caixa de verdade */
+      return r.width > 40 && r.height > 40 ? el : null;
+    } catch (e) {
+      return null;
+    }
+  };
+
+  const findAnchorBox = () => {
+    const video = document.querySelector("video");
+    if (video && video.parentElement) return video.parentElement;
+
+    /* o perfil sabe melhor que a heurística */
+    const byProfile = anchorFromProfile();
+    if (byProfile) return byProfile;
+
+    const frames = document.querySelectorAll("iframe");
+
+    /* NÃO basta o primeiro iframe: a página tem iframes de anúncio
+       antes do player. Preferimos o que está dentro de um container
+       de player. */
+    let target = null;
+    for (let i = 0; i < frames.length; i++) {
+      const f = frames[i];
+      const holder = f.parentElement;
+      const sig = (
+        (holder && holder.className ? holder.className : "") +
+        " " +
+        (f.className || "") +
+        " " +
+        (f.id || "")
+      ).toLowerCase();
+      if (/player|stage|video|embed/.test(sig)) {
+        target = f;
+        break;
+      }
+    }
+    if (!target && frames.length) target = frames[0];
+    if (!target) return null;
+
+    /* SUBIR até um container de verdade.
+
+       Este era o bug que escondia o botão no animesdrive. A cadeia do
+       player é:
+
+           iframe → .animeo-player__media   (0x0, fonte inativa)
+                  → .animeo-player__source  (0x0)
+                  → .animeo-player__stage   (1125x633, a caixa visível)
+
+       A âncora parava no .media, que tem área zero — o botão ficava
+       montado num lugar invisível. Subindo até a primeira caixa com
+       tamanho real, cai na stage, que é onde o vídeo aparece. */
+    let box = target.parentElement;
+    let guard = 0;
+    while (box && box !== document.body && box !== document.documentElement && guard < 8) {
+      const r = box.getBoundingClientRect();
+      if (r.width > 40 && r.height > 40) return box;
+      box = box.parentElement;
+      guard++;
+    }
+    return null;
+  };
+
+  const placeIn = (host, box) => {
+    /* o absolute precisa de um containing block posicionado */
     try {
       if (window.getComputedStyle(box).position === "static") {
         box.style.position = "relative";
@@ -198,8 +324,35 @@
     } catch (e) {
       /* getComputedStyle indisponível */
     }
-
     box.appendChild(host);
+  };
+
+  const anchorToVideo = (host) => {
+    const box = findAnchorBox();
+    if (!box || box === document.body) {
+      document.body.appendChild(host);
+      return;
+    }
+    placeIn(host, box);
+  };
+
+  /* player-bar.js roda em document_idle, e no animesdrive o iframe do
+     player nem sempre existe nesse instante: o site monta o player por
+     JS depois. O botão nasce no <body> — canto da PÁGINA, longe do
+     vídeo — e, como `ui` já estava preenchido, nunca mais se movia.
+
+     Aqui puxamos o botão para o container do player assim que ele
+     existir. Só age enquanto o botão estiver no <body>: ancorado no
+     player de verdade, não mexe mais. */
+  const reanchor = () => {
+    if (!ui || !ui.isConnected) return;
+    const box = findAnchorBox();
+    /* Sem condição de tamanho aqui de propósito: o único jeito de o
+       botão ficar invisível é estar num container sem área, e
+      oir findAnchorBox() sozinho não garante que o alvo certo já
+       exista. Reprocessar a cada 2s converge assim que a stage
+       aparece. */
+    if (box && box !== ui.parentElement) placeIn(ui, box);
   };
 
   /* ---------- o botão ---------- */
@@ -264,39 +417,66 @@
       ev.preventDefault();
       ev.stopPropagation(); // não repassa o clique para o player
       next = !current;
-      chrome.storage.sync.set({ theaterMode: next });
+      PFM.theater.set(next);
     });
 
     host.__btn = btn;
     host.__lbl = root.querySelector(".lbl");
 
-    /* ---------- auto-hide ---------- */
+    /* ---------- auto-hide ----------
 
-    const hide = () => {
-      host.style.opacity = "0";
-    };
+       O botão desaparece sozinho depois de HIDE_AFTER_MS sem
+       atividade, e volta com qualquer movimento do mouse sobre o
+       frame em que ele está. Na primeira aparição ele fica mais
+       tempo à vista (FIRST_SHOW_MS) para ser notado. */
+    /* Auto-hide por ATIVIDADE, não por "saiu da área".
 
-    const scheduleHide = () => {
-      clearTimeout(host.__hideTimer);
-      host.__hideTimer = setTimeout(hide, HIDE_AFTER_MS);
-    };
+       A versão anterior dependia de mouseleave na caixa do player.
+       Isso não funciona: quando o cursor está sobre o vídeo, ele está
+       dentro de um iframe, e o iframe não propaga mouseleave para o
+       documento pai — o botão aparecia no hover e nunca mais sumia.
+
+       Aqui o botão esconde depois de HIDE_AFTER_MS sem NENHUMA
+       atividade (movimento do mouse, toque, tecla ou rolagem) neste
+       documento, e volta a aparecer na hora que houver qualquer uma.
+       É determinístico: funciona dentro e fora de iframe. */
+    let lastActivity = Date.now();
 
     const show = () => {
+      lastActivity = Date.now();
       host.style.opacity = "1";
-      scheduleHide();
     };
 
+    const touch = () => {
+      lastActivity = Date.now();
+      host.style.opacity = "1";
+    };
+
+    const events = ["mousemove", "mouseover", "pointermove", "touchstart", "keydown", "wheel"];
+    events.forEach((ev) =>
+      document.addEventListener(ev, touch, { passive: true })
+    );
     host.addEventListener("mouseenter", show);
     host.addEventListener("mousemove", show);
-    host.addEventListener("mouseleave", scheduleHide);
 
-    /* qualquer movimento do mouse no frame reacende o botão */
-    document.addEventListener("mousemove", show, { passive: true });
-    document.addEventListener("touchstart", show, { passive: true });
+    /* A primeira aparição dura FIRST_SHOW_MS, para o botão ser
+       notado; depois valem os HIDE_AFTER_MS normais. */
+    let limit = FIRST_SHOW_MS;
 
-    /* primeira aparição: fica mais tempo à vista */
-    clearTimeout(host.__hideTimer);
-    host.__hideTimer = setTimeout(hide, FIRST_SHOW_MS);
+    /* Rede de segurança: mesmo sem nenhum evento, o botão some.
+       Um setTimeout de-la sozinho não sobrevive a um player que
+       reconstrói o próprio DOM. */
+    setInterval(() => {
+      if (Date.now() - lastActivity < limit) {
+        host.style.opacity = "1";
+      } else {
+        host.style.opacity = "0";
+        limit = HIDE_AFTER_MS;
+      }
+    }, 300);
+
+    lastActivity = Date.now();
+
     return host;
   };
 
@@ -315,19 +495,43 @@
     if (!document.body) return;
     if (!isPlayerFrame()) return;
 
-    /* se já existe um host neste frame, reaproveita */
+    /* Reaproveita um host já existente — MAS só se for realmente
+       nosso. Um div órfão com esse id (sobrou de uma renderização
+       antiga, ou veio no HTML salvo) não tem shadow root nem botão:
+       reaproveitar esse elemento deixaria um host invisível e o
+       mount() nunca mais tentaria de novo. */
     const already = document.getElementById(BTN_ID);
-    if (already) {
+    if (already && already.shadowRoot && already.shadowRoot.querySelector(".t")) {
       ui = already;
       paint();
       return;
     }
+    if (already && already.parentNode) already.parentNode.removeChild(already);
 
     /* o botão não entra na barra de controles: vai sempre ancorado no
        canto superior direito do vídeo. findControlBar() continua sendo
        usado apenas como sinal na arbitragem (para eleger o frame certo). */
     const host = buildUI();
     anchorToVideo(host);
+
+    /* pergunta ao frame principal onde está a stage e, se souber,
+       reanora nela. Sem isso a heurística pode parar numa caixa 0x0
+       e o botão fica invisível. */
+    if (PFM.arbiter && PFM.arbiter.askStage) {
+      PFM.arbiter.askStage().then((sel) => {
+        if (!sel) return;
+        cachedStage = sel;
+        try {
+          const el = document.querySelector(sel);
+          const r = el && el.getBoundingClientRect();
+          if (el && r && r.width > 40 && r.height > 40 && ui) {
+            placeIn(ui, el);
+          }
+        } catch (e) {
+          /* seletor inválido: segue na heurística */
+        }
+      });
+    }
 
     ui = host;
     paint();
@@ -387,7 +591,11 @@ const mountIfWinner = async () => {
      clica no vídeo, o foco vai para dentro do iframe, e a tecla é
      disparada no documento do frame interno. O listener do frame
      principal nunca a vê. */
-  document.addEventListener(
+  /* window em capture, e nao document: o caminho de propagacao comeca
+     no window, entao um handler do player (ArtPlayer/Video.js registra
+     hotkeys em window com capture e chama stopPropagation) rodaria
+     ANTES do nosso e engoliria o T assim que o video comecasse. */
+  window.addEventListener(
     "keydown",
     (ev) => {
       const tag = (ev.target && ev.target.tagName) || "";
@@ -398,12 +606,12 @@ const mountIfWinner = async () => {
         ev.preventDefault();
         ev.stopPropagation();
         next = !current;
-        chrome.storage.sync.set({ theaterMode: next });
+        PFM.theater.set(next);
       } else if (ev.key === "Escape" && current) {
         ev.preventDefault();
         ev.stopPropagation();
         next = false;
-        chrome.storage.sync.set({ theaterMode: false });
+        PFM.theater.set(false);
       }
     },
     true
@@ -411,21 +619,20 @@ const mountIfWinner = async () => {
 
   /* ---------- estado ---------- */
 
-  chrome.storage.sync
-    .get({ theaterMode: false })
-    .then((o) => {
-      current = !!o.theaterMode;
-      next = current;
+  /* o estado e POR SITE: um site nao pode virar o outro */
+  PFM.theater
+    .get()
+    .then((on) => {
+      current = on;
+      next = on;
       mountIfWinner();
       paint();
     })
     .catch(() => mountIfWinner());
 
-  chrome.storage.onChanged.addListener((changes, area) => {
-    if (area !== "sync") return;
-    if (!("theaterMode" in changes)) return;
-    current = !!changes.theaterMode.newValue;
-    next = current;
+  PFM.theater.onChange((on) => {
+    current = on;
+    next = on;
     mountIfWinner();
     paint();
   });
@@ -447,6 +654,7 @@ const mountIfWinner = async () => {
     raf(() => {
       pending = false;
       mountIfWinner();
+      reanchor();
     });
   });
 
@@ -467,6 +675,7 @@ const mountIfWinner = async () => {
      a gente remontaria — mas só se o árbitro liberar. Por isso avisamos
      o árbitro de que o botão anterior não existe mais. */
   setInterval(() => {
+    reanchor();
     if (ui && !ui.isConnected) {
       ui = null;
       /* avisa que a concessão anterior ficou sem botão, para o

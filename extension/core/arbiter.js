@@ -19,6 +19,17 @@
   "use strict";
 
   const PFM = (window.PFM = window.PFM || {});
+
+  /* Este arquivo entra em DUAS entradas do manifest:
+       content_scripts[0] — document_start, so no frame principal
+       content_scripts[2] — document_idle, all_frames (inclui o topo)
+
+     No frame principal ele acaba executando duas vezes. A segunda
+     vez criaria um `state` novo e sobrescreveria o PFM.arbiter que o
+     content.js ja instalou — a disputa recomeçaria do zero e o
+     dono anterior perderia a vaga. */
+  if (PFM.arbiter) return;
+
   const CHANNEL = "pfm-theater";
 
   const state = {
@@ -27,7 +38,8 @@
     mountedAt: 0,
     lastSeen: 0,
     pending: null,
-    timer: null
+    timer: null,
+    stage: null
   };
 
   /* Sem checagem de vivacidade, a vaga fica presa com um frame morto:
@@ -74,6 +86,11 @@
   };
 
   /* Instala o árbitro. Só faz sentido no frame principal. */
+  /* o content.js publica aqui qual é a stage do site atual */
+  const setStage = (sel) => {
+    state.stage = sel || null;
+  };
+
   const install = () => {
     if (!isTopFrame()) return false;
 
@@ -82,6 +99,16 @@
       if (!d || d.__pfm !== CHANNEL) return;
 
       if (d.kind === "probe") {
+        /* O frame principal nao pode arbitrar a si mesmo.
+
+           probe() usa window.top.postMessage; no topo window.top ===
+           window, entao o probe volta para o proprio arbitro. Sem
+           este filtro, o topo concede a vaga para si mesmo ANTES de
+           o frame que realmente contem o <video> perguntar — e o
+           player, chegando depois, recebe "deny". Era o que fazia o
+           botao nunca aparecer sobre o video. */
+        if (ev.source === window) return;
+
         const now = Date.now();
         const granted = state.grantedTo;
         /* concede se ninguém tem, se quem tinha não chegou a montar,
@@ -117,6 +144,17 @@
         if (d.id === state.grantedTo) {
           state.mountedAt = Date.now();
           state.lastSeen = Date.now();
+        }
+      } else if (d.kind === "where") {
+        /* O frame do player perguntou onde está a stage. Só o frame
+           principal sabe (é ele que carregou o perfil), e ele
+           responde — postMessage atravessa origem, ao contrário de
+           document.documentElement.dataset. */
+        if (d.source && state.stage) {
+          d.source.postMessage(
+            { __pfm: CHANNEL, kind: "stage", sel: state.stage },
+            "*"
+          );
         }
       } else if (d.kind === "gone") {
         /* o frame que tinha o botão perdeu o nó (o player se
@@ -170,6 +208,31 @@
       }
     });
 
+  /* o frame do player pede a stage ao frame principal */
+  const askStage = () =>
+    new Promise((resolve) => {
+      let done = false;
+      const finish = (v) => {
+        if (done) return;
+        done = true;
+        clearTimeout(t);
+        window.removeEventListener("message", onMsg);
+        resolve(v || null);
+      };
+      const onMsg = (ev) => {
+        const d = ev.data;
+        if (!d || d.__pfm !== CHANNEL || d.kind !== "stage") return;
+        finish(d.sel);
+      };
+      const t = setTimeout(() => finish(null), 400);
+      window.addEventListener("message", onMsg);
+      try {
+        window.top.postMessage({ __pfm: CHANNEL, kind: "where" }, "*");
+      } catch (e) {
+        finish(null);
+      }
+    });
+
   const notify = (id, kind) => {
     try {
       window.top.postMessage({ __pfm: CHANNEL, kind, id }, "*");
@@ -178,5 +241,5 @@
     }
   };
 
-  PFM.arbiter = { install, probe, notify, CHANNEL, state, PING_TIMEOUT };
+  PFM.arbiter = { install, probe, notify, askStage, setStage, CHANNEL, state, PING_TIMEOUT };
 })();

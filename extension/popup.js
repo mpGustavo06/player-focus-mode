@@ -7,8 +7,7 @@ const DEFAULTS = {
   hideComments: true,
   hideAds: true,
   blockPopups: true,
-  widePlayer: true,
-  theaterMode: false
+  widePlayer: true
 };
 
 const boxes = Array.from(document.querySelectorAll("input[type=checkbox][data-key]"));

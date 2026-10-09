@@ -19,8 +19,7 @@
     hideComments: true,
     hideAds: true,
     blockPopups: true,
-    widePlayer: true,
-    theaterMode: false
+    widePlayer: true
   };
 
   let current = { ...DEFAULTS };
