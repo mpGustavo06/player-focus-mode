@@ -113,8 +113,18 @@
         ".animeq-footer-copy"
       ],
 
-      /* some sempre que a limpeza está ativa */
-      always: [".fcmpbox"]
+      /* some sempre que a limpeza está ativa.
+
+         O .animeq-push-optin é o convite de notificações ("Não perca
+         novos episódios!"). Ele é injetado por JS depois do
+         carregamento, mas como o hide aqui é CSS puro, ele some
+         assim que aparecer — não precisa de MutationObserver. */
+      always: [
+        ".fcmpbox",
+        "#animeq-push-optin",
+        ".animeq-push-optin",
+        ".animeq-push-status"
+      ]
     },
 
     /* nada precisa sair do DOM neste site */
@@ -171,13 +181,26 @@
             inclui `body.single-episodes`, elevando para (0,3,2).
     ------------------------------------------------------------ */
     css: `
-      /* (a) container mais externo: único lugar com respiro lateral */
+      /* (a) container mais externo.
+
+         Sem respiro lateral: o vídeo ocupa a largura toda da janela.
+         Havia 12px de padding aqui para "colar o player da borda",
+         mas o resultado era uma faixa vazia dos dois lados do
+         vídeo — que é justamente o que incomodava. */
       #contenedor {
         max-width: none !important;
         width: 100% !important;
-        margin: 0 auto !important;
-        padding-left: 12px !important;
-        padding-right: 12px !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+
+      /* (a2) <br> soltos sobrando do breadcrumb removido.
+
+         Esconder o breadcrumb tira a caixa dele, mas os <br> que
+         o tema deixava ao redor continuam occupying linha: dois
+         deles = 28px de espaço morto acima do vídeo. */
+      #contenedor > br {
+        display: none !important;
       }
 
       /* (b) + (c) zera max-width, o padding lateral e a margem de 360px */
@@ -189,11 +212,13 @@
       .dtsingle .content.left,
       .dt_contenedor {
         max-width: none !important;
+        width: auto !important;
         min-width: 0 !important;
         max-height: none !important;
         height: auto !important;
         margin: 0 !important;
         padding: 0 !important;
+        border: 0 !important;
         float: none !important;
       }
       body.single-episodes #single.dtsingle,
@@ -276,6 +301,128 @@
         margin: 0 !important;
         max-width: none !important;
         transform: none !important;
+      }
+
+      /* (3) acabamento da barra e dos controles
+
+         Estas regras vivem no PERFIL, e não no core: o core cuida
+         so de esconder a barra no modo "so o player". O tema ja
+         desenha separadores e botoes proprios, e uma regra generica
+         acabava brigando com o estilo de cada site.
+
+         O que estava feio, e por que:
+
+           .animeo-player__meta e a BARRA: um bloco so, arredondado.
+           .animeo-player__servers e .animeo-player__quick-controls
+           sao LINHAS dentro dela: flex + gap, com um separador
+           entre elas. A primeira linha nao ganha separador, senao
+           ele aparece duplicado logo abaixo do topo arredondado.
+
+         Os botoes ficavam com o estilo padrao do navegador (fundo
+         cinza, borda 2px outset, sem raio) porque o tema estiliza
+         classes especificas que nem sempre existem em todas as
+         versoes do player. Aqui estilizamos o elemento, nao a
+         classe. */
+      .animeo-player__meta {
+        display: block !important;
+        background: #0d0f12 !important;
+        border: 0 !important;
+        border-radius: 12px !important;
+        margin: 0 0 12px !important;
+        padding: 0 !important;
+        overflow: hidden !important;
+        float: none !important;
+      }
+
+      .animeo-player__servers,
+      .animeo-player__quick-controls,
+      .animeo-player__status {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        align-items: center !important;
+        gap: 8px !important;
+        background: transparent !important;
+        border: 0 !important;
+        border-top: 1px solid #1e2128 !important;
+        border-radius: 0 !important;
+        margin: 0 !important;
+        padding: 10px 12px !important;
+        float: none !important;
+      }
+
+      /* a primeira linha encosta na barra: sem separador duplo */
+      .animeo-player__meta > .animeo-player__servers:first-child,
+      .animeo-player__meta > .animeo-player__quick-controls:first-child,
+      .animeo-player__meta > .animeo-player__status:first-child {
+        border-top: 0 !important;
+      }
+
+      /* navegacao anterior / todos / proximo */
+      .animeo-watch-nav-v2474,
+      .pag_episodes {
+        display: block !important;
+        background: transparent !important;
+        border: 0 !important;
+        margin: 12px 0 0 !important;
+        padding: 0 !important;
+        float: none !important;
+      }
+      .animeo-watch-nav-v2474 .pag_episodes,
+      .pag_episodes.aq-nav-v241 {
+        display: grid !important;
+        grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+        gap: 12px !important;
+        margin: 0 !important;
+      }
+
+      /* os botoes */
+      .animeo-player__meta button,
+      .animeo-player__meta a,
+      .animeo-player__meta [role="button"] {
+        appearance: none !important;
+        -webkit-appearance: none !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 6px !important;
+        min-height: 34px !important;
+        padding: 0 12px !important;
+        border: 1px solid #262b34 !important;
+        border-radius: 8px !important;
+        background: #161a20 !important;
+        color: #e8eaed !important;
+        font: 600 12px/1 "Segoe UI", system-ui, sans-serif !important;
+        cursor: pointer !important;
+        white-space: nowrap !important;
+        box-shadow: none !important;
+        float: none !important;
+        text-decoration: none !important;
+        min-width: 0 !important;
+      }
+      .animeo-player__meta button:hover,
+      .animeo-player__meta a:hover {
+        background: #1e232b !important;
+        border-color: #3a4250 !important;
+        color: #fff !important;
+      }
+      .animeo-player__meta button:focus-visible,
+      .animeo-player__meta a:focus-visible {
+        outline: 2px solid #6ea8fe !important;
+        outline-offset: 2px !important;
+      }
+      .animeo-player__meta .item a.nonex,
+      .animeo-player__meta button[disabled] {
+        opacity: 0.4 !important;
+        pointer-events: none !important;
+      }
+
+      /* servidor ativo: destaca com a cor do proprio tema */
+      .animeo-player__servers button.is-active,
+      .animeo-player__servers .aq-server.is-active,
+      .animeo-player__servers button[aria-pressed="true"] {
+        background: #f5b400 !important;
+        border-color: #f5b400 !important;
+        color: #17130a !important;
       }
     `
   });
